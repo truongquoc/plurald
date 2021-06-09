@@ -1,10 +1,11 @@
 import sys, os, re, getpass, io
 from subprocess import Popen, PIPE, STDOUT
-
+import time
+from threading import Event
 # IMPORTANT SETTINGS TO PREVENT SPAM BLOCKING OF YOUR ACCOUNT/IP AT PLURALSIGHT #
 SLEEP_INTERVAL = 150 #                                                          #
 SLEEP_OFFSET = 50    #               Change this at your own risk.              #
-RATE_LIMIT = "1M"    #                                                          #
+RATE_LIMIT = "3M"    #                                                          #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 DLPATH, USERNAME, PASSWORD = "", "", ""
@@ -57,8 +58,7 @@ def _cli_request(command, logpath):
             for line in io.TextIOWrapper(process.stdout, newline=''):
                 sys.stdout.write(line)
                 logfile.write(line)
-                logfile.flush()
-
+                logfile.flush()   
 
 def _get_youtube_dl_cli_command(course, sleep_interval=SLEEP_INTERVAL, sleep_offset=SLEEP_OFFSET, rate_limit=RATE_LIMIT):
     """Putting together youtube-dl CLI command used to invoke the download requests.
@@ -81,9 +81,12 @@ def _get_youtube_dl_cli_command(course, sleep_interval=SLEEP_INTERVAL, sleep_off
     pluraurl = PLURAURL
     username = qu + USERNAME + qu
     password = qu + PASSWORD + qu
+    sublang = qu + "en" + qu
+    subformat = qu + "srt" + qu
+    header = qu + "https://app.pluralsight.com/library/courses" + qu
     filename_template = qu + "%(playlist_index)s-%(chapter_number)s-%(title)s-%(resolution)s.%(ext)s" + qu
     minsleep = sleep_interval
-    
+   
     # CMD Tool # # # # # #
     tool = "youtube-dl"  #
     # Flags - useful settings when invoking download request
@@ -92,14 +95,18 @@ def _get_youtube_dl_cli_command(course, sleep_interval=SLEEP_INTERVAL, sleep_off
     minsl =  "--sleep-interval" + sp + str(minsleep)
     maxsl =  "--max-sleep-interval" + sp + str(minsleep + sleep_offset)
     lrate = "--limit-rate" + sp + rate_limit
+    add_header = "--add-header referer:"+header
     fn =  "-o" + sp + filename_template
     vrb =   "--verbose"
     curl = qu + pluraurl + course + qu
-
+    sub_lang = "--sub-lang" + sp + sublang
+    sub_format = "--sub-format" + sp + subformat
+    write_sub = "--write-sub "
     # Join command
-    cli_components = [tool, usr, pw, minsl, maxsl, lrate, fn, vrb, curl]
+    cli_components = [tool, usr, pw, add_header, sub_lang, sub_format, write_sub, minsl, maxsl, lrate, fn, vrb, curl]
     command = sp.join(cli_components)
-
+    print("command "+command)
+    #Event().wait(15)
     return command
 
 
@@ -124,7 +131,14 @@ def _pluradl(course):
     logile = course + ".log"
     logpath = os.path.join(coursepath,logile)
     _cli_request(command, logpath)
-
+    os.chdir("../../")
+    with open("courselist.clone.txt", "a+") as file_object:
+        # Move read cursor to the start of line 
+        file_object.seek(0)
+        data = file_object.read(100)
+        if len(data) > 0:
+            file_object.write("\n")
+        file_object.write(course) 
 
 def download_courses(courses):
     """Dowloading all courses listed in courselist.txt
@@ -148,13 +162,18 @@ def get_courses(scriptpath):
     """
     # courses textfile prelocated inside script directory
     filelist = "courselist.txt"
-    
     # Loops the list's lines and stores it as a python list
     filepath = os.path.join(scriptpath,filelist)
     courses = []
+    current_file = open("courselist.clone.txt", "r")
+    current_courses = []
+    for line in current_file.readlines():
+        current_courses.append(line.strip())
     try:
         with open(filepath, 'r+') as file:
             for line in file.readlines():
+                if(line.strip() in current_courses):
+                    continue
                 if re.search(r'\S', line):
                     courses.append(line.strip())
         return courses
@@ -175,7 +194,10 @@ def main():
         PASSWORD = sys.argv[2]
     else:
         _get_usr_pw()
-
+    print("username "+USERNAME)
+    print("password "+PASSWORD)
+    #Event().wait(100)
+    #time.sleep(10)
     # Script's absolute directory path
     scriptpath = os.path.dirname(os.path.abspath(sys.argv[0]))
     

@@ -142,3 +142,7 @@ dmypy.json
 .logs
 .logs/
 .logs/*
+
+
+#should Ignore all downloaded courses
+Courses/*
